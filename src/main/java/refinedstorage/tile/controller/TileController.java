@@ -57,8 +57,6 @@ public class TileController extends TileBase implements INetworkMaster, IEnergyR
     private WirelessGridHandler wirelessGridHandler = new WirelessGridHandler(this);
 
     private List<ItemStack> items = new ArrayList<ItemStack>();
-    private List<ItemStack> combinedItems = new ArrayList<ItemStack>();
-    private Set<Integer> combinedItemsIndices = new HashSet<Integer>();
 
     private List<IStorage> storages = new ArrayList<IStorage>();
 
@@ -411,52 +409,58 @@ public class TileController extends TileBase implements INetworkMaster, IEnergyR
         updateItemsWithClient();
     }
 
+    private java.util.Hashtable<Integer,ArrayList<ItemStack>> itemsorttable = new java.util.Hashtable<Integer,ArrayList<ItemStack>>();
+    
     private void updateItems() {
-        items.clear();
+		items.clear();
 
-        for (IStorage storage : storages) {
-            storage.addItems(items);
-        }
+		//Load items from storages
+		for (IStorage storage : storages) {
+			storage.addItems(items);
+		}
 
-        for (ICraftingPattern pattern : patterns) {
-            for (ItemStack output : pattern.getOutputs()) {
-                ItemStack patternStack = output.copy();
-                patternStack.stackSize = 0;
-                items.add(patternStack);
-            }
-        }
+		//Load craftables from patterns
+		for (ICraftingPattern pattern : patterns) {
+			for (ItemStack output : pattern.getOutputs()) {
+				ItemStack patternStack = output.copy();
+				patternStack.stackSize = 0;
+				items.add(patternStack);
+			}
+		}
 
-        combinedItems.clear();
-        combinedItemsIndices.clear();
+		itemsorttable.clear();
+		for (int i = 0; i < items.size(); ++i) {
+			ItemStack stack = items.get(i);
+			Integer k = RefinedStorageUtils.itemstackhashcode(stack);
+			if (itemsorttable.containsKey(k)) {
+				ArrayList<ItemStack> innerlist = itemsorttable.get(k);
 
-        for (int i = 0; i < items.size(); ++i) {
-            if (combinedItemsIndices.contains(i)) {
-                continue;
-            }
+				boolean merged = false;
+				for (int j = 0; j < innerlist.size(); ++j) {
+					ItemStack otherStack = innerlist.get(j);
+					if (RefinedStorageUtils.compareStackNoQuantity(stack,
+							otherStack)) {
+						ItemStack newStack = stack.copy();
+						newStack.stackSize += otherStack.stackSize;
+						innerlist.set(j, newStack);
+						merged = true;
+						break;
+					}
+				}
 
-            ItemStack stack = items.get(i);
+				if (!merged)
+					innerlist.add(stack);
+			} else {
+				ArrayList<ItemStack> newlist = new ArrayList<ItemStack>();
+				newlist.add(stack);
+				itemsorttable.put(k, newlist);
+			}
+		}
 
-            for (int j = i + 1; j < items.size(); ++j) {
-                if (combinedItemsIndices.contains(j)) {
-                    continue;
-                }
-
-                ItemStack otherStack = items.get(j);
-
-                if (RefinedStorageUtils.compareStackNoQuantity(stack, otherStack)) {
-                    // We copy here so we don't modify the quantity of the ItemStack IStorage uses.
-                    // We re-get the ItemStack because the stack may change from a previous iteration in this loop
-                    ItemStack newStack = items.get(i).copy();
-                    newStack.stackSize += otherStack.stackSize;
-                    items.set(i, newStack);
-
-                    combinedItems.add(otherStack);
-                    combinedItemsIndices.add(j);
-                }
-            }
-        }
-
-        items.removeAll(combinedItems);
+		items.clear();
+		for (Integer k : itemsorttable.keySet()) {
+			items.addAll(itemsorttable.get(k));
+		}
     }
 
     @Override

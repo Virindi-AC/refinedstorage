@@ -134,6 +134,30 @@ public final class RefinedStorageUtils {
     public static boolean compareStackNoQuantity(ItemStack left, ItemStack right) {
         return compareStack(left, right, CompareFlags.COMPARE_NBT | CompareFlags.COMPARE_DAMAGE);
     }
+    
+	public static int itemstackhashcode(ItemStack i) {
+		if (i == null)
+			return 0;
+		int ret = i.getItemDamage();
+
+		if (i.hasTagCompound())
+			ret = (ret << 4) ^ (i.getTagCompound().hashCode());
+
+		ret = (ret << 4) ^ (i.getItem().hashCode());
+		return ret;
+	}
+
+	public static int compareStackNoQuantityInt(ItemStack left, ItemStack right) {
+		return itemstackhashcode(left) - itemstackhashcode(right);
+	}
+
+	public static class ItemStackComparer implements
+			java.util.Comparator<ItemStack> {
+		@Override
+		public int compare(ItemStack o1, ItemStack o2) {
+			return compareStackNoQuantityInt(o1, o2);
+		}
+	}
 
     public static boolean compareStackOreDict(ItemStack left, ItemStack right) {
         if (left == null && right == null) {
